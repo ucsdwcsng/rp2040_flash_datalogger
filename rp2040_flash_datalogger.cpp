@@ -1,8 +1,9 @@
-#include "rawflash_datalogger.h"
+#include "rp2040_flash_datalogger.h"
+#include <cstdarg> // for va_list
 
 FlashWriter::FlashWriter()
 {
-    erased_sectors = 0;
+    erased_sector_count = 0;
     initializeFlash();
 }
 
@@ -73,7 +74,7 @@ void FlashWriter::eraseSector(int sector_offset)
     flash_range_erase(sector_offset, FLASH_SECTOR_SIZE); // Erasing the first sector
     restore_interrupts(ints);
 
-    erased_sectors++;
+    erased_sector_count++;
 }
 
 void FlashWriter::seekNextSector()
@@ -110,13 +111,31 @@ int FlashWriter::findPageAddress(int page)
     return XIP_BASE + current_flash_target_offset + (page * FLASH_PAGE_SIZE);
 }
 
-void FlashWriter::write(String data)
+void FlashWriter::print(String data)
 {
     buffer += data; // Append the data to the internal buffer
-    if (buffer.length() >= FLASH_PAGE_SIZE)
+    if (buffer.length() >= FLASH_PAGE_SIZE || data[data.length() - 1] == '\n')
     {
         flush();
     }
+}
+
+void FlashWriter::println(String data)
+{
+    print(data + "\n");
+}
+
+void FlashWriter::printf(const char *format, ...)
+{
+    char buffer[128]; // Define a suitable buffer size
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    // return String(buffer);
+
+    print(String(buffer)); // Use your existing write method
 }
 
 void FlashWriter::flush()
@@ -139,9 +158,23 @@ void FlashWriter::flush()
     seekNextPage();
 }
 
+// take default argument for max sector
+FlashReader::FlashReader() : FlashReader(FLASH_TARGET_OFFSET_MAX)
+{
+}
+
 FlashReader::FlashReader(unsigned int max_sector)
 {
-    this->max_sector = max_sector;
+    // max sector should be min of max_sector and FLASH_TARGET_OFFSET_MAX
+    if (max_sector > FLASH_TARGET_OFFSET_MAX)
+    {
+        this->max_sector = FLASH_TARGET_OFFSET_MAX;
+    }
+    else
+    {
+        this->max_sector = max_sector;
+    }
+
     current_sector = SECTOR_START_OFFSET;
     current_page = 0;
 }
@@ -177,6 +210,10 @@ String FlashReader::read()
                 break; // End of data in this page
             }
         }
+    }
+    else
+    {
+        max_sector = current_sector; // Reached the end of data
     }
 
     current_page++;

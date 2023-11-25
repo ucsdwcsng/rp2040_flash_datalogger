@@ -1,5 +1,5 @@
-#ifndef rawflash_datalogger_h
-#define rawflash_datalogger_h
+#ifndef rp2040_flash_datalogger_h
+#define rp2040_flash_datalogger_h
 
 #include <Arduino.h>
 
@@ -22,10 +22,11 @@ class FlashWriter
 {
 public:
     FlashWriter();
-    void write(String data);
-    void flush();
+    void print(String data);
+    void println(String data);
+    void printf(const char *format, ...);
     int current_page;
-    int erased_sectors;
+    int erased_sector_count;
     int current_flash_target_offset;
 
 private:
@@ -38,6 +39,8 @@ private:
     void seekNextSector();
     void seekNextPage();
 
+    void flush();
+
     void eraseSector(int sector_offset);
     int findPageAddress(int page);
 };
@@ -46,6 +49,7 @@ class FlashReader
 {
 public:
     FlashReader(unsigned int max_sector);
+    FlashReader();
     String read();
     unsigned int current_sector;
     unsigned int max_sector;
